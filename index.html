@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Blood Donor System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
+.box{background:#fff;padding:20px;margin:15px auto;width:360px;border-radius:8px;box-shadow:0 0 8px rgba(0,0,0,0.1);}
+input,select,button{width:100%;padding:8px;margin:5px 0;border-radius:4px;border:1px solid #ccc;}
+button{background:#c40000;color:#fff;border:none;cursor:pointer;}
+button:hover{opacity:0.9;}
+img{width:80px;height:80px;border-radius:50%;margin-top:10px;}
+@media(max-width:600px){.box{width:95%;}}
+</style>
+</head>
+<body>
+
+<!-- Registration Form -->
+<div class="box">
+<h3>Donor Registration</h3>
+<input id="name" placeholder="Full Name">
+<select id="blood">
+<option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+<option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+</select>
+<input id="age" placeholder="Age">
+<input id="phone" placeholder="Phone Number">
+<input id="location" placeholder="Location (Dhaka, Khilkhet)">
+<input type="date" id="lastDonate">
+<input type="file" id="photo" accept="image/*">
+<button onclick="register()">Submit</button>
+</div>
+
+<!-- Donor ID Card -->
+<div class="box" id="card" style="display:none;">
+<h3>Donor ID Card</h3>
+<img id="cardPhoto">
+<p><b>ID:</b> <span id="cid"></span></p>
+<p><b>Name:</b> <span id="cname"></span></p>
+<p><b>Blood Group:</b> <span id="cblood"></span></p>
+<p><b>Status:</b> Pending</p>
+<button onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<!-- ID Search -->
+<div class="box">
+<h3>Search Donor by ID</h3>
+<input id="searchId" placeholder="BD-xxxx">
+<button onclick="search()">Search</button>
+<div id="result"></div>
+</div>
+
+<!-- Location Filter -->
+<div class="box">
+<h3>Find Donor by Location</h3>
+<input id="loc" placeholder="Enter location">
+<button onclick="filterLoc()">Search</button>
+<div id="locResult"></div>
+</div>
+
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbzYeJA97F9af6gPLpZF41YqpVMDvZkYAeggtuDfgq825WqJ2hg1PtMrcDLyFEevO-MLDQ/exec";
+
+// -------------------
+// Registration function
+function register(){
+    const reader = new FileReader();
+    const file = document.getElementById("photo").files[0];
+    if(!file){ alert("Please select a photo"); return; }
+    const id = "BD-" + Date.now();
+
+    reader.onload = async () => {
+        const data = {
+            id:id,
+            name: document.getElementById("name").value,
+            blood: document.getElementById("blood").value,
+            age: document.getElementById("age").value,
+            phone: document.getElementById("phone").value,
+            location: document.getElementById("location").value,
+            lastDonate: document.getElementById("lastDonate").value,
+            photo: reader.result
+        };
+
+        try{
+            await fetch(scriptURL,{
+                method:"POST",
+                body: JSON.stringify(data)
+            });
+
+            // Show ID Card
+            document.getElementById("card").style.display = "block";
+            document.getElementById("cid").innerText = id;
+            document.getElementById("cname").innerText = data.name;
+            document.getElementById("cblood").innerText = data.blood;
+            document.getElementById("cardPhoto").src = data.photo;
+
+            alert("Donor Registered Successfully!");
+        }catch(err){
+            alert("Error submitting data. Check Web App deployment.");
+            console.log(err);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// -------------------
+// Search by ID
+function search(){
+    const id = document.getElementById("searchId").value;
+    if(!id){ alert("Enter ID"); return; }
+    fetch(scriptURL+"?id="+id)
+    .then(r=>r.json())
+    .then(d=>{
+        const res = document.getElementById("result");
+        if(d.error){ res.innerHTML="❌ Donor Not Found"; return; }
+        res.innerHTML = `<img src="${d.photo}"><br>
+        <b>${d.name}</b><br>
+        Blood: ${d.blood}<br>
+        Location: ${d.location}<br>
+        Status: ${d.status}`;
+    });
+}
+
+// -------------------
+// Location filter
+function filterLoc(){
+    const loc = document.getElementById("loc").value;
+    if(!loc){ alert("Enter location"); return; }
+    fetch(scriptURL+"?location="+loc)
+    .then(r=>r.json())
+    .then(d=>{
+        const div = document.getElementById("locResult");
+        div.innerHTML="";
+        if(d.length==0){ div.innerHTML="No donors found"; return; }
+        d.forEach(x=>{
+            div.innerHTML+=`${x.name} (${x.blood}) - ${x.phone}<br>`;
+        });
+    });
+}
+
+// -------------------
+// Download PDF
+function downloadPDF(){
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+    pdf.text("Blood Donor ID Card",20,20);
+    pdf.text("ID: "+document.getElementById("cid").innerText,20,40);
+    pdf.text("Name: "+document.getElementById("cname").innerText,20,50);
+    pdf.text("Blood: "+document.getElementById("cblood").innerText,20,60);
+    pdf.save("Donor-ID.pdf");
+}
+</script>
+</body>
+</html>
